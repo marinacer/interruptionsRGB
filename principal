@@ -1,0 +1,191 @@
+#define F_CPU 16000000UL
+#include <avr/interrupt.h>
+#include <util/delay.h>
+
+unsigned char *p_ddrb;
+unsigned char *p_portb;
+unsigned char *p_ddrc;
+unsigned char *p_pinc;
+unsigned char *p_pull_up;
+unsigned char velocidade;
+unsigned char estado;
+unsigned char led;
+unsigned char sentido;
+
+/*INT0*/
+unsigned char *p_eicra;
+unsigned char *p_eimsk;
+unsigned char *p_ucsr0b;
+
+/*PCINT1*/
+unsigned char *p_pcicr;
+unsigned char *p_pcmsk1;
+
+/*rotina de interrupção de INT0 que controla a velocidade do LED*/
+ISR(INT0_vect)
+{
+	if (velocidade < 3){
+		velocidade ++;
+	}
+	else{
+		velocidade = 0;
+	}
+}
+
+/*rotina de interrupção de PCINT1 que controla o sentido do LED*/
+ISR(PCINT1_vect)
+{
+	if ((*p_pinc & 1) == 0){
+	if (sentido == 1){
+		sentido = 0;
+	}
+	else{
+		sentido = 1;
+	}
+	}
+}
+
+void setup(void)
+{
+	p_ddrb = (unsigned char *) 0x24;
+	p_portb = (unsigned char*) 0x25;
+	p_ddrc = (unsigned char *) 0x27;
+	p_pinc = (unsigned char *) 0x26;
+	p_pull_up = (unsigned char *) 0x55;
+	p_ddrb |= 0x07; /*ddrb como saída para PORTB0(R), PORTB1(G) e PORTB2(B)*/
+	p_ddrc &= 0xFE; /*ddrc como entrada para PINC0*/
+	*p_pull_up &= 0xEF;
+
+	/*INT0*/
+	p_eicra = (unsigned char *) 0x69;
+	p_eimsk = (unsigned char *) 0x3D;
+	p_eicra |= 0x03; /*define INT0 sensível à borda de subida*/
+	p_eimsk |= 0x01; /*habilita interrupções em INT0*/
+	*p_ucsr0b = 0;
+	
+	/*PCINT1*/
+	p_pcicr = (unsigned char *) 0x68;
+	p_pcmsk1 = (unsigned char *) 0x6C;
+	p_pcicr |= 0x02; /*habilita interrupções de PCINT8 a PCINT14*/
+	p_pcmsk1 |= 0x01; /*habilita interrupções em PCINT8*/
+	
+	sei();	/*seta I em SREG, habilitando as interrupções*/
+}
+
+int main(void){
+/*inicializações*/
+	velocidade = 0;
+	led = 0;
+	setup();
+	
+	while(1){
+	/*define o tempo do delay de acordo com o nº de vezes que a interrupção INT0 foi chamada*/
+  if (velocidade == 0) { _delay_ms(1000);}
+	if (velocidade == 1) { _delay_ms(500);}
+	if (velocidade == 2) { _delay_ms(250);}
+	if (velocidade == 3) { _delay_ms(125);}
+
+	if(led == 0) {p_portb = 0x00;} /*apagado R = 0; G = 0; B = 0*/
+		if(led == 1){p_portb = 0x01;} /*vermelho R = 1; G = 0; B = 0*/
+	if(led == 2)   {p_portb = 0x02;} /*verde R = 0; G = 1; B = 0*/
+		if(led == 3)    {p_portb = 0x04;} /*azul R = 0; G = 0; B = 1*/
+	if(led == 4) {p_portb = 0x03;} /*amarelo R = 1; G = 1; B = 0*/
+		if(led == 5)   {p_portb = 0x06;} /*ciano R = 0; G = 1; B = 1*/
+	if(led == 6) {p_portb = 0x05;} /*magenta R = 1; G = 0; B = 1*/
+		if(led == 7)  {p_portb = 0x07;} /*branco R = 1; G = 1; B = 1*/	
+
+	switch(estado)
+	{   /*a variável 'botao' define o sentido das cores e é alterada na interrupção PCINT1
+		sentido = 0 horário
+		sentido = 1 anti-horário*/
+	
+		case 0:
+		led = 0;
+		if (sentido == 1){
+			estado = 7;
+		}
+		else{
+			estado = 1;
+		}
+		break;
+		
+		
+		case 1:
+		led = 1;
+		if (sentido == 1){
+			estado = 0;	
+		}
+		else{
+			estado = 2;
+		}
+		break;
+		
+		
+		case 2:
+		led = 2;
+		if (sentido == 1){
+			estado = 1;
+		}
+		else{
+			estado = 3;
+		}
+		break;
+		
+		
+		case 3:
+		led = 3;
+		if (sentido == 1){
+			estado = 2;
+		}
+		else{
+			estado = 4;
+		}
+		break;
+		
+		
+		case 4:
+		led = 4;
+		if (sentido == 1){
+			estado = 3;
+		}
+		else{
+			estado = 5;
+			}
+		break;
+		
+		
+		case 5:
+		led = 5;
+		if (sentido == 1){
+			estado = 4;
+		}
+		else{
+			estado = 6;
+		}
+		break;
+		
+		
+		case 6:
+		led = 6;
+		if (sentido == 1){
+			estado = 5;
+		}
+		else{
+			estado = 7;
+		}
+		break;
+		
+		
+		case 7:
+		led = 7;
+		if (sentido == 1){
+			estado = 6;
+		}
+		else{
+			estado = 0;
+		}
+		break;
+
+		}
+	}
+}
